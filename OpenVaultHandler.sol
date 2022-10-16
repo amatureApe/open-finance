@@ -54,13 +54,6 @@ contract OpenVaultHandler is ReentrancyGuard {
     // All replies by replyId
     mapping(uint256 => Reply) public replies;
 
-
-
-    // Vault types according to their interface compatibility i.e. UniV2, Curve, Balancer, etc.
-    mapping(uint256 => string) public vaultTypes;
-    // Contract that distributes rewards
-    mapping(uint256 => address) public chefs;
-
     struct Vault {
         uint256 vaultId;
         address vault;
@@ -75,7 +68,7 @@ contract OpenVaultHandler is ReentrancyGuard {
         uint256 maxFee;
         uint256 strategistFee;
         uint256 harvesterFee;
-        uint256 stakerFee;
+        // uint256 stakerFee;
     }
 
     // Struct to manage likes, dislikes, and comments on vaults
@@ -120,13 +113,13 @@ contract OpenVaultHandler is ReentrancyGuard {
         uint256 maxFee = strategy.maxFee();
         uint256 strategistFee = strategy.strategistFee();
         uint256 harvesterFee = strategy.harvesterFee();
-        uint256 stakerFee = strategy.stakerFee();
+        // uint256 stakerFee = strategy.stakerFee();
 
         Fees memory _fees = Fees(
             maxFee,
             strategistFee,
-            harvesterFee,
-            stakerFee
+            harvesterFee
+            // stakerFee
         );
 
         Vault memory __vault = Vault(

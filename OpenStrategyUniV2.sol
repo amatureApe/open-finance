@@ -123,7 +123,7 @@ contract UniswapV2Strategy {
         strategistFee = _fees[1];
         harvesterFee = _fees[2];
 
-        // setup lp routing
+        // // setup lp routing
         lpToken0 = IUniswapV2Pair(want).token0();
         require(_nativeToLp0Route[0] == native, "nativeToLp0Route[0] != native");
         require(_nativeToLp0Route[_nativeToLp0Route.length - 1] == lpToken0, "nativeToLp0Route[last] != lpToken0");
