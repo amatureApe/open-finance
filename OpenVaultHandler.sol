@@ -76,8 +76,9 @@ contract OpenVaultHandler is ReentrancyGuard {
     // Struct to manage likes, dislikes, and comments on vaults
     struct VaultInfo {
         uint256 vaultId;
-        uint256 VaultLikes;
-        uint256 VaultDislikes;
+        uint256 vaultLikes;
+        uint256 vaultDislikes;
+        uint256 totalCommentary;
     }
 
     // Struct to manage comments on vaults
@@ -152,10 +153,10 @@ contract OpenVaultHandler is ReentrancyGuard {
     }
 
     function likeVault(uint256 _vaultId) external {
-        vaultInfo[_vaultId].VaultLikes++;
+        vaultInfo[_vaultId].vaultLikes++;
     }
     function dislikeVault(uint256 _vaultId) external {
-        vaultInfo[_vaultId].VaultDislikes++;
+        vaultInfo[_vaultId].vaultDislikes++;
     }
 
     function makeComment(uint256 _vaultId, string memory _comment) external {
@@ -169,6 +170,7 @@ contract OpenVaultHandler is ReentrancyGuard {
 
         comments[commentId] = comment;
         commentId++;
+        vaultInfo[_vaultId].totalCommentary++;
     }
     function likeComment(uint256 _commentId) external {
         Comment storage comment = comments[_commentId];
@@ -191,6 +193,7 @@ contract OpenVaultHandler is ReentrancyGuard {
         );
         replies[replyId] = reply;
         replyId++;
+        vaultInfo[_vaultId].totalCommentary++;
     }
     function likeReply(uint256 _replyId) external {
         Reply storage reply = replies[_replyId];

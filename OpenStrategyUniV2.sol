@@ -56,6 +56,10 @@ interface IChef {
     function rewarder(uint256 pid) external view returns (address);
 }
 
+interface IRewarder {
+    function pendingToken(uint256 pid, address user) external view returns (uint256);
+}
+
 contract UniswapV2Strategy {
     using SafeERC20 for IERC20;
 
@@ -86,6 +90,7 @@ contract UniswapV2Strategy {
 
     // Routes
     address[] public rewardToNativeRoute;
+    address[] public secondRewardToNativeRoute;
     address[] public nativeToLp0Route;
     address[] public nativeToLp1Route;
 
@@ -103,6 +108,7 @@ contract UniswapV2Strategy {
         address _strategist,
         uint256[] memory _fees,
         address[] memory _rewardToNativeRoute,
+        address[] memory _secondRewardToNativeRoute,
         address[] memory _nativeToLp0Route,
         address[] memory _nativeToLp1Route
     ) {
@@ -114,8 +120,10 @@ contract UniswapV2Strategy {
         strategist = _strategist;
 
         reward = _rewardToNativeRoute[0];
+        secondReward = _secondRewardToNativeRoute[0];
         native = _nativeToLp0Route[0];
         rewardToNativeRoute = _rewardToNativeRoute;
+        secondRewardToNativeRoute = _secondRewardToNativeRoute;
 
         require(_fees.length == 3, "invalid num of fees");
         require(_fees[0] >= _fees[1] + _fees[2], "invalid fees");
@@ -185,8 +193,12 @@ contract UniswapV2Strategy {
     // performance fees
     function chargeFees(address harvester) internal {
         uint256 toNative = IERC20(reward).balanceOf(address(this));
-        if (toNative > 0) {
+        uint256 secondToNative = IERC20(secondReward).balanceOf(address(this));
+        if (toNative > 0 && reward != native) {
             IUniswapRouter(router).swapExactTokensForTokens(toNative, 0, rewardToNativeRoute, address(this), block.timestamp);
+        }
+        if (secondToNative > 0 && secondReward != native) {
+            IUniswapRouter(router).swapExactTokensForTokens(secondToNative, 0, secondRewardToNativeRoute, address(this), block.timestamp);
         }
 
         uint256 nativeBal = IERC20(native).balanceOf(address(this));
@@ -233,14 +245,19 @@ contract UniswapV2Strategy {
         return _amount;
     }
 
-    function rewardsAvailable() public view returns (uint256) {
+    function rewardsAvailable() public view returns (uint256, uint256) {
         uint256 rewardBal = IChef(chef).pendingSushi(poolId, address(this));
+        uint256 secondRewardBal;
+        if (secondReward != address(0)) {
+            address rewarder = IChef(chef).rewarder(poolId);
+            secondRewardBal = IRewarder(rewarder).pendingToken(poolId, address(this));
+        }
 
-        return rewardBal;
+        return (rewardBal, secondRewardBal);
     }
 
     function callReward() public view returns (uint256) {
-        uint rewardBal = rewardsAvailable();
+        (uint rewardBal, uint secondRewardBal) = rewardsAvailable();
         uint256 nativeBal;
 
         try IUniswapRouter(router).getAmountsOut(rewardBal, rewardToNativeRoute)
@@ -250,13 +267,22 @@ contract UniswapV2Strategy {
         }
         catch {}
 
+        if (secondReward != address(0)) {
+            try IUniswapRouter(router).getAmountsOut(secondRewardBal, secondRewardToNativeRoute)
+                returns (uint256[] memory amountOut)
+            {
+                nativeBal = nativeBal + amountOut[amountOut.length -1];
+            }
+            catch {}
+        }
+
         return nativeBal * (strategistFee + harvesterFee) / maxFee;
     }
 
     function _giveAllowances() internal {
         IERC20(want).safeApprove(chef, type(uint256).max);
         IERC20(reward).safeApprove(router, type(uint256).max);
-        if (secondReward != address(0)) {
+        if (secondReward != address(0) && secondReward != native && secondReward != lpToken0 && secondReward != lpToken1) {
             IERC20(secondReward).safeApprove(router, type(uint256).max);
         }
         IERC20(native).safeApprove(router, type(uint256).max);

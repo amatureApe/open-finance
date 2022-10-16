@@ -89,7 +89,6 @@ contract OpenVault is ERC20, ReentrancyGuard {
     function deposit(uint _amount) public nonReentrant isActive {
         uint256 _pool = balance();
         want().safeTransferFrom(msg.sender, address(this), _amount);
-        // earn();
         uint256 _after = balance();
         _amount = _after.sub(_pool); // Additional check for deflationary tokens
         uint256 shares = 0;
