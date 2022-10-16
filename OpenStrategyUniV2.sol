@@ -59,12 +59,14 @@ interface IChef {
 contract UniswapV2Strategy {
     using SafeERC20 for IERC20;
 
-    // Vault for strategy
+    // Vault addresses
     address public vault;
+    address public strategist;
 
     // Tokens used
     address public native;
     address public reward;
+    address public secondReward;
     address public want;
     address public lpToken0;
     address public lpToken1;
@@ -72,17 +74,15 @@ contract UniswapV2Strategy {
     // Third party contracts
     address public chef;
     uint256 public poolId;
+    address public router;
 
     uint256 public lastHarvest;
 
     // Fees
     uint256 public maxFee;
-
     uint256 public strategistFee;
-    uint256 public stakerFee;
     uint256 public harvesterFee;
-
-    // uint256 public performancePODLFee = 500;
+    uint256 private constant FEE_DIVISOR = 10000;
 
     // Routes
     address[] public rewardToNativeRoute;
@@ -92,7 +92,7 @@ contract UniswapV2Strategy {
     event StratHarvest(address indexed harvester, uint256 wantHarvested, uint256 tvl);
     event Deposit(uint256 tvl);
     event Withdraw(uint256 tvl);
-    event ChargedFees(uint256 callFees, uint256 beefyFees, uint256 strategistFees);
+    event ChargedFees(uint256 strategistFees, uint256 harvesterFee);
 
     constructor(
         address _vault,
@@ -110,17 +110,18 @@ contract UniswapV2Strategy {
         want = _want;
         poolId = _poolId;
         chef = _chef;
+        router = _router;
+        strategist = _strategist;
 
         reward = _rewardToNativeRoute[0];
         native = _nativeToLp0Route[0];
         rewardToNativeRoute = _rewardToNativeRoute;
 
-        require(_fees.length == 4, "invalid num of fees");
-        require(_fees[0] >= _fees[1] + _fees[2] + _fees[3], "invalid fees");
+        require(_fees.length == 3, "invalid num of fees");
+        require(_fees[0] >= _fees[1] + _fees[2], "invalid fees");
         maxFee = _fees[0];
         strategistFee = _fees[1];
         harvesterFee = _fees[2];
-        stakerFee = _fees[3];
 
         // setup lp routing
         lpToken0 = IUniswapV2Pair(want).token0();
@@ -141,7 +142,7 @@ contract UniswapV2Strategy {
         uint256 wantBal = IERC20(want).balanceOf(address(this));
 
         if (wantBal > 0) {
-            IChef(chef).deposit(poolId, wantBal);
+            IChef(chef).deposit(poolId, wantBal, address(this));
             emit Deposit(balanceOf());
         }
     }
@@ -152,7 +153,7 @@ contract UniswapV2Strategy {
         uint256 wantBal = IERC20(want).balanceOf(address(this));
 
         if (wantBal < _amount) {
-            IChef(chef).withdraw(poolId, _amount - wantBal);
+            IChef(chef).withdraw(poolId, _amount - wantBal, address(this));
             wantBal = IERC20(want).balanceOf(address(this));
         }
 
@@ -166,12 +167,12 @@ contract UniswapV2Strategy {
     }
 
     // compounds earnings and charges performance fee
-    function harvest(address callFeeRecipient) public {
-        IChef(chef).deposit(poolId, 0);
-        uint256 rewardBal = IERC20(output).balanceOf(address(this));
+    function harvest(address harvester) public {
+        IChef(chef).deposit(poolId, 0, address(this));
+        uint256 rewardBal = IERC20(reward).balanceOf(address(this));
 
         if (rewardBal > 0) {
-            chargeFees(callFeeRecipient);
+            chargeFees(harvester);
             addLiquidity();
             uint256 wantHarvested = balanceOfWant();
             deposit();
@@ -182,32 +183,21 @@ contract UniswapV2Strategy {
     }
 
     // performance fees
-    function chargeFees(address callFeeRecipient) internal {
-        IFeeConfig.FeeCategory memory fees = getFees();
-        uint256 toNative = IERC20(output).balanceOf(address(this)) * fees.total / DIVISOR;
+    function chargeFees(address harvester) internal {
+        uint256 toNative = IERC20(reward).balanceOf(address(this));
         if (toNative > 0) {
-            IUniswapRouter(unirouter).swapExactTokensForTokens(toNative, 0, outputToNativeRoute, address(this), block.timestamp);
+            IUniswapRouter(router).swapExactTokensForTokens(toNative, 0, rewardToNativeRoute, address(this), block.timestamp);
         }
 
-        if (secondOutput != address(0)) {
-            uint256 secondToNative = IERC20(secondOutput).balanceOf(address(this));
-            if (secondToNative > 0) {
-                IUniswapRouter(unirouter).swapExactTokensForTokens(secondToNative, 0, secondOutputToNativeRoute, address(this), block.timestamp);
-            }
-        }
+        uint256 nativeBal = IERC20(native).balanceOf(address(this));
 
-        uint256 nativeBal = IERC20(native).balanceOf(address(this)) * fees.total / DIVISOR;
+        uint256 strategistAmount = nativeBal * strategistFee / maxFee;
+        uint256 harvesterAmount = nativeBal * harvesterFee / maxFee;
 
-        uint256 callFeeAmount = nativeBal * fees.call / DIVISOR;
-        IERC20(native).safeTransfer(callFeeRecipient, callFeeAmount);
+        IERC20(native).safeTransfer(strategist, strategistAmount);
+        IERC20(native).safeTransfer(harvester, harvesterAmount);
 
-        uint256 beefyFeeAmount = nativeBal * fees.beefy / DIVISOR;
-        IERC20(native).safeTransfer(beefyFeeRecipient, beefyFeeAmount);
-
-        uint256 strategistFee = nativeBal * fees.strategist / DIVISOR;
-        IERC20(native).safeTransfer(strategist, strategistFee);
-
-        emit ChargedFees(callFeeAmount, beefyFeeAmount, strategistFee);
+        emit ChargedFees(strategistFee, harvesterFee);
     }
 
     // Adds liquidity to AMM and gets more LP tokens.
@@ -215,16 +205,16 @@ contract UniswapV2Strategy {
         uint256 nativeHalf = IERC20(native).balanceOf(address(this)) / 2;
 
         if (lpToken0 != native) {
-            IUniswapRouter(unirouter).swapExactTokensForTokens(nativeHalf, 0, nativeToLp0Route, address(this), block.timestamp);
+            IUniswapRouter(router).swapExactTokensForTokens(nativeHalf, 0, nativeToLp0Route, address(this), block.timestamp);
         }
 
         if (lpToken1 != native) {
-            IUniswapRouter(unirouter).swapExactTokensForTokens(nativeHalf, 0, nativeToLp1Route, address(this), block.timestamp);
+            IUniswapRouter(router).swapExactTokensForTokens(nativeHalf, 0, nativeToLp1Route, address(this), block.timestamp);
         }
 
         uint256 lp0Bal = IERC20(lpToken0).balanceOf(address(this));
         uint256 lp1Bal = IERC20(lpToken1).balanceOf(address(this));
-        IUniswapRouter(unirouter).addLiquidity(lpToken0, lpToken1, lp0Bal, lp1Bal, 1, 1, address(this), block.timestamp);
+        IUniswapRouter(router).addLiquidity(lpToken0, lpToken1, lp0Bal, lp1Bal, 1, 1, address(this), block.timestamp);
     }
 
     // calculate the total underlaying 'want' held by the strat.
@@ -239,62 +229,47 @@ contract UniswapV2Strategy {
 
     // it calculates how much 'want' the strategy has working in the farm.
     function balanceOfPool() public view returns (uint256) {
-        (uint256 _amount,) = ISpookyChefV2(chef).userInfo(poolId, address(this));
+        (uint256 _amount,) = IChef(chef).userInfo(poolId, address(this));
         return _amount;
     }
 
-    function rewardsAvailable() public view returns (uint256, uint256) {
-        address rewarder = ISpookyChefV2(chef).rewarder(poolId);
-        uint256 outputBal = ISpookyRewarder(rewarder).pendingToken(poolId, address(this));
-        uint256 secondBal;
-        if (secondOutput != address(0)) {
-            secondBal = ISpookyChefV2(chef).pendingBOO(poolId, address(this));
-        }
+    function rewardsAvailable() public view returns (uint256) {
+        uint256 rewardBal = IChef(chef).pendingSushi(poolId, address(this));
 
-        return (outputBal, secondBal);
+        return rewardBal;
     }
 
     function callReward() public view returns (uint256) {
-        IFeeConfig.FeeCategory memory fees = getFees();
-        (uint256 outputBal, uint256 secondBal) = rewardsAvailable();
+        uint rewardBal = rewardsAvailable();
         uint256 nativeBal;
 
-        try IUniswapRouter(unirouter).getAmountsOut(outputBal, outputToNativeRoute)
+        try IUniswapRouter(router).getAmountsOut(rewardBal, rewardToNativeRoute)
             returns (uint256[] memory amountOut)
         {
             nativeBal = nativeBal + amountOut[amountOut.length -1];
         }
         catch {}
 
-        if (secondOutput != address(0)) {
-            try IUniswapRouter(unirouter).getAmountsOut(secondBal, secondOutputToNativeRoute)
-                returns (uint256[] memory amountOut)
-            {
-                nativeBal = nativeBal + amountOut[amountOut.length -1];
-            }
-            catch {}
-        }
-
-        return nativeBal * fees.total / DIVISOR * fees.call / DIVISOR;
+        return nativeBal * (strategistFee + harvesterFee) / maxFee;
     }
 
     function _giveAllowances() internal {
         IERC20(want).safeApprove(chef, type(uint256).max);
-        IERC20(output).safeApprove(unirouter, type(uint256).max);
-        if (secondOutput != address(0)) {
-            IERC20(secondOutput).safeApprove(unirouter, type(uint256).max);
+        IERC20(reward).safeApprove(router, type(uint256).max);
+        if (secondReward != address(0)) {
+            IERC20(secondReward).safeApprove(router, type(uint256).max);
         }
-        IERC20(native).safeApprove(unirouter, type(uint256).max);
+        IERC20(native).safeApprove(router, type(uint256).max);
 
-        IERC20(lpToken0).safeApprove(unirouter, 0);
-        IERC20(lpToken0).safeApprove(unirouter, type(uint256).max);
+        IERC20(lpToken0).safeApprove(router, 0);
+        IERC20(lpToken0).safeApprove(router, type(uint256).max);
 
-        IERC20(lpToken1).safeApprove(unirouter, 0);
-        IERC20(lpToken1).safeApprove(unirouter, type(uint256).max);
+        IERC20(lpToken1).safeApprove(router, 0);
+        IERC20(lpToken1).safeApprove(router, type(uint256).max);
     }
 
-    function outputToNative() external view returns (address[] memory) {
-        return outputToNativeRoute;
+    function rewardToNative() external view returns (address[] memory) {
+        return rewardToNativeRoute;
     }
 
     function nativeToLp0() external view returns (address[] memory) {
