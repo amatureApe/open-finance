@@ -154,10 +154,6 @@ contract OpenVaultHandler is ReentrancyGuard {
         vault.description = bytes(description);
     }
 
-    function harvest(uint256 _vaultId) external {
-
-    }
-
     function likeVault(uint256 _vaultId) external {
         vaultInfo[_vaultId].VaultLikes++;
     }
