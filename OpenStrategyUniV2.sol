@@ -168,7 +168,7 @@ contract UniswapV2Strategy {
 
     // compounds earnings and charges performance fee
     function harvest(address harvester) public {
-        IChef(chef).deposit(poolId, 0, address(this));
+        IChef(chef).harvest(poolId, address(this));
         uint256 rewardBal = IERC20(reward).balanceOf(address(this));
 
         if (rewardBal > 0) {
@@ -181,6 +181,32 @@ contract UniswapV2Strategy {
             emit StratHarvest(msg.sender, wantHarvested, balanceOf());
         }
     }
+
+    // function testHarvest1() public {
+    //     IChef(chef).harvest(poolId, address(this));
+    // }
+
+    // function testHarvest2() public view returns (uint) {
+    //     uint256 rewardBal = IERC20(reward).balanceOf(address(this));
+    //     return rewardBal;
+    // }
+
+    // function testHarvest3(address harvester) public {
+    //     chargeFees(harvester);
+    // }
+
+    // function testHarvest4() public {
+    //     addLiquidity();
+    // }
+
+    // function testHarvest5() public view returns (uint) {
+    //     uint256 wantHarvested = balanceOfWant();
+    //     return wantHarvested;
+    // }
+
+    // function testHarvest6() public {
+    //     deposit();
+    // }
 
     // performance fees
     function chargeFees(address harvester) internal {

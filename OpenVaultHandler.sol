@@ -43,6 +43,8 @@ contract OpenVaultHandler is ReentrancyGuard {
     mapping(uint256 => Vault) public vaults;
     // All vaultInfos by their vaultId
     mapping(uint256 => VaultInfo) public vaultInfo;
+    // Check to see if vault is already added
+    mapping(address => bool) public addedVaults;
 
     // Current commentId index
     uint256 public commentId = 0;
@@ -103,6 +105,7 @@ contract OpenVaultHandler is ReentrancyGuard {
     ) external returns (bool) {
         IVault vault = IVault(_vault);
         require(vault.active() == true, "vault not active");
+        require(addedVaults[_vault] == false, "already added");
 
         address _strategy = vault.strategy();
         IStrategy strategy = IStrategy(_strategy);
