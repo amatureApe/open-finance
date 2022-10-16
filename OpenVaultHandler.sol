@@ -89,16 +89,17 @@ contract OpenVaultHandler is ReentrancyGuard {
     struct Comment {
         uint256 vaultId;
         uint256 commentId;
-        string comment;
+        bytes comment;
         uint256 commentLikes;
         uint256 commentDislikes;
     }
 
     // Struct to manage replies to comments
     struct Reply {
+        uint256 vaultId;
         uint256 commentId;
         uint256 replyId;
-        string reply;
+        bytes reply;
         uint256 replyLikes;
         uint256 replyDislikes;
     }
@@ -165,7 +166,7 @@ contract OpenVaultHandler is ReentrancyGuard {
         Comment memory comment = Comment(
             _vaultId,
             commentId,
-            _comment,
+            bytes(_comment),
             0,
             0
         );
@@ -183,10 +184,12 @@ contract OpenVaultHandler is ReentrancyGuard {
     }
 
     function makeReply(uint256 _commentId, string memory _reply) external {
+        uint256 _vaultId = comments[_commentId].vaultId;
         Reply memory reply = Reply(
+            _vaultId,
             _commentId,
             replyId,
-            _reply,
+            bytes(_reply),
             0,
             0
         );
@@ -211,6 +214,16 @@ contract OpenVaultHandler is ReentrancyGuard {
     function readDescription(uint256 _vaultId) external view returns (string memory) {
         Vault storage vault = vaults[_vaultId];
         return string(vault.description);
+    }
+
+    function readComment(uint256 _commentId) external view returns (string memory) {
+        Comment storage comment = comments[_commentId];
+        return string(comment.comment);
+    }
+
+    function readReply(uint256 _replyId) external view returns (string memory) {
+        Reply storage reply = replies[_replyId];
+        return string(reply.reply);
     }
 
 }
