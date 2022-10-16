@@ -64,7 +64,8 @@ contract OpenVault is ERC20, ReentrancyGuard {
     function addStrategy(address _strategy) public {
       require(active == false, "vault already active");
       strategy = IStrategy(_strategy);
-      require(msg.sender == strategy.strategist());
+      require(msg.sender == strategy.strategist(), "not strategist");
+      require(strategy.vault() == address(this), "incorrect vault");
       active = true;
     }
 
