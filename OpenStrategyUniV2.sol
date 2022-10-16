@@ -182,32 +182,6 @@ contract UniswapV2Strategy {
         }
     }
 
-    // function testHarvest1() public {
-    //     IChef(chef).harvest(poolId, address(this));
-    // }
-
-    // function testHarvest2() public view returns (uint) {
-    //     uint256 rewardBal = IERC20(reward).balanceOf(address(this));
-    //     return rewardBal;
-    // }
-
-    // function testHarvest3(address harvester) public {
-    //     chargeFees(harvester);
-    // }
-
-    // function testHarvest4() public {
-    //     addLiquidity();
-    // }
-
-    // function testHarvest5() public view returns (uint) {
-    //     uint256 wantHarvested = balanceOfWant();
-    //     return wantHarvested;
-    // }
-
-    // function testHarvest6() public {
-    //     deposit();
-    // }
-
     // performance fees
     function chargeFees(address harvester) internal {
         uint256 toNative = IERC20(reward).balanceOf(address(this));
