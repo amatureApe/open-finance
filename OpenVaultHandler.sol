@@ -4,7 +4,6 @@ pragma solidity ^0.8.15;
 
 // import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/ERC20.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
-// import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/access/Ownable.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/security/ReentrancyGuard.sol";
 import "https://github.com/transmissions11/solmate/blob/main/src/mixins/ERC4626.sol";
 
@@ -28,6 +27,11 @@ interface IStrategy {
     function balanceOfPool() external view returns (uint256);
     function harvest() external;
     function router() external view returns (address);
+}
+
+interface IVault {
+    function strategy() external view returns (address);
+    function active() external view returns (bool);
 }
 
 contract OpenVaultHandler is ReentrancyGuard {
@@ -63,6 +67,7 @@ contract OpenVaultHandler is ReentrancyGuard {
         address strategy;
         address want;
         address strategist;
+        bytes description;
         Fees fees;
     }
 
@@ -100,11 +105,14 @@ contract OpenVaultHandler is ReentrancyGuard {
 
     // ******* MUTATIVE FUNCTIONS ***********
     function addVault(
-        address _strategy
+        address _vault
     ) external returns (bool) {
+        IVault vault = IVault(_vault);
+        require(vault.active() == true, "vault not active");
+
+        address _strategy = vault.strategy();
         IStrategy strategy = IStrategy(_strategy);
 
-        address vault = strategy.vault();
         address want = address(strategy.want());
         address strategist = strategy.strategist();
 
@@ -120,23 +128,30 @@ contract OpenVaultHandler is ReentrancyGuard {
             stakerFee
         );
 
-        Vault memory _vault = Vault(
+        Vault memory __vault = Vault(
             vaultId, // vaultId
-            vault,
+            _vault,
             _strategy, // strategy address
             want, // want
             strategist, // strategist
+            "",
             _fees
         );
 
         VaultInfo memory info;
         info.vaultId = vaultId;
 
-        vaults[vaultId] = _vault;
+        vaults[vaultId] = __vault;
         vaultInfo[vaultId] = info;
         vaultId++;
 
         return true;
+    }
+
+    function addDescription(uint256 _vaultId, string memory description) external {
+        Vault storage vault = vaults[_vaultId];
+        require(msg.sender == vault.strategist, "Not strategist");
+        vault.description = bytes(description);
     }
 
     function harvest(uint256 _vaultId) external {
@@ -196,5 +211,10 @@ contract OpenVaultHandler is ReentrancyGuard {
     // function balance(uint256 _vaultId) public view returns (uint) {
     //   return want().balanceOf(address(this)).add(IStrategy(strategy).balanceOf());
     // }
+
+    function readDescription(uint256 _vaultId) external view returns (string memory) {
+        Vault storage vault = vaults[_vaultId];
+        return string(vault.description);
+    }
 
 }

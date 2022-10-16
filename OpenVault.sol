@@ -42,7 +42,13 @@ contract OpenVault is ERC20, ReentrancyGuard {
     IStrategy public strategy;
 
     // Bool to identify if strategy has been set and vault is active
-    bool active = false;
+    bool public active = false;
+
+    // Modifier to check if strategy has been set and vault is active
+    modifier isActive {
+        require(active == true, "vault not active");
+        _;
+    }
 
     /**
      * @dev Sets the value of {token} to the token that the vault will
@@ -80,7 +86,7 @@ contract OpenVault is ERC20, ReentrancyGuard {
      * @dev The entrypoint of funds into the system. People deposit with this function
      * into the vault. The vault is then in charge of sending funds into the strategy.
      */
-    function deposit(uint _amount) public nonReentrant {
+    function deposit(uint _amount) public nonReentrant isActive {
         uint256 _pool = balance();
         want().safeTransferFrom(msg.sender, address(this), _amount);
         earn();
@@ -99,7 +105,7 @@ contract OpenVault is ERC20, ReentrancyGuard {
      * @dev Function to send funds into the strategy and put them to work. It's primarily called
      * by the vault's deposit() function.
      */
-    function earn() public {
+    function earn() public isActive {
         uint _bal = available();
         want().safeTransfer(address(strategy), _bal);
         strategy.deposit();
@@ -117,7 +123,7 @@ contract OpenVault is ERC20, ReentrancyGuard {
      * from the strategy and pay up the token holder. A proportional number of IOU
      * tokens are burned in the process.
      */
-    function withdraw(uint256 _shares) public {
+    function withdraw(uint256 _shares) public nonReentrant isActive {
         uint256 r = (balance().mul(_shares)).div(totalSupply());
         _burn(msg.sender, _shares);
 
@@ -139,7 +145,7 @@ contract OpenVault is ERC20, ReentrancyGuard {
     // ********** VIEWS ***************
     // ********************************
 
-    function want() public view returns (IERC20) {
+    function want() public view isActive returns (IERC20) {
         return IERC20(strategy.want());
     }
 
@@ -148,7 +154,7 @@ contract OpenVault is ERC20, ReentrancyGuard {
      * It takes into account the vault contract balance, the strategy contract balance
      *  and the balance deployed in other contracts as part of the strategy.
      */
-    function balance() public view returns (uint) {
+    function balance() public view isActive returns (uint) {
         return want().balanceOf(address(this)).add(IStrategy(strategy).balanceOf());
     }
 
@@ -158,7 +164,7 @@ contract OpenVault is ERC20, ReentrancyGuard {
      * want to keep some of the system funds at hand in the vault, instead
      * of putting them to work.
      */
-    function available() public view returns (uint256) {
+    function available() public view isActive returns (uint256) {
         return want().balanceOf(address(this));
     }
 
