@@ -80,6 +80,8 @@ contract UniswapV2Strategy {
     uint256 public immutable poolId;
     address public immutable router;
 
+    // Check if vault successfully harvested
+    bool public successfulHarvest;
     uint256 public lastHarvest;
 
     // Fees
@@ -187,6 +189,10 @@ contract UniswapV2Strategy {
 
             lastHarvest = block.timestamp;
             emit StratHarvest(msg.sender, wantHarvested, balanceOf());
+        }
+
+        if (successfulHarvest == false) {
+            successfulHarvest = true;
         }
     }
 

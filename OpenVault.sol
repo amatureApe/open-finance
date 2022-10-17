@@ -6,6 +6,7 @@ import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contr
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/token/ERC20/utils/SafeERC20.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/math/SafeMath.sol";
 import "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 
 interface IStrategy {
     function vault() external view returns (address);
@@ -46,7 +47,10 @@ contract OpenVault is ERC20, ReentrancyGuard {
     // The strategy in use by the vault.
     IStrategy public strategy;
     // The vaultHandler for this chain
-    IVaultHandler public vaultHandler;
+    IVaultHandler public immutable vaultHandler;
+    // The address that deployed this vault
+    address public deployer = msg.sender;
+    string public factoryId = Strings.toString(OpenVaultFactory(deployer).factoryId());
 
     // Bool to identify if strategy has been set and vault is active
     bool public active = false;
@@ -61,10 +65,14 @@ contract OpenVault is ERC20, ReentrancyGuard {
         address _vaultHandler,
         address _token
     ) ERC20(
-        string(abi.encodePacked("Open ", ERC20(_token).name())),
-        string(abi.encodePacked("OPEN", ERC20(_token).symbol()))
+        string(abi.encodePacked("Open ", ERC20(_token).name(), " factoryId-", factoryId)),
+        string(abi.encodePacked("OPEN", ERC20(_token).symbol(),"-", factoryId))
     ) {
         vaultHandler = IVaultHandler(_vaultHandler);
+    }
+
+    function test() public view returns(uint256) {
+        return OpenVaultFactory(deployer).factoryId();
     }
 
     // Modifier to check if strategy has been set and vault is active
@@ -196,7 +204,13 @@ contract OpenVault is ERC20, ReentrancyGuard {
 }
 
 contract OpenVaultFactory {
-   OpenVault[] public OpenVaultArray;
+    // Mapping of all vaults launched by this factory contract.
+   mapping(uint256 => OpenVault) public factoryVaults;
+   // All factory vault Ids. These are not the same as Vault Ids on the
+   // the Vault Handler. VaultId on Vault Handler correspond to successfully
+   // added vaults.
+   uint256 public factoryId = 0;
+   // Address of vault handler
    address public immutable vaultHandler;
 
     constructor (
@@ -207,6 +221,7 @@ contract OpenVaultFactory {
 
    function CreateNewVault(address _token) public {
      OpenVault vault = new OpenVault(vaultHandler, _token);
-     OpenVaultArray.push(vault);
+     factoryVaults[factoryId] = vault;
+     ++factoryId;
    }
 }

@@ -27,11 +27,13 @@ interface IStrategy {
     function balanceOfPool() external view returns (uint256);
     function harvest() external;
     function router() external view returns (address);
+    function successfulHarvest() external view returns (bool);
 }
 
 interface IVault {
     function strategy() external view returns (address);
     function active() external view returns (bool);
+    function deployer() external view returns (address);
 }
 
 contract OpenVaultHandler is ReentrancyGuard {
@@ -62,6 +64,11 @@ contract OpenVaultHandler is ReentrancyGuard {
     uint256 public replyId = 0;
     // All replies by replyId
     mapping(uint256 => Reply) public replies;
+
+    // Vault deployer address
+    address public vaultFactory;
+    // Check to see if vaultDeployer has been set
+    bool public vaultFactoryActive = false;
 
     struct Vault {
         uint256 vaultId;
@@ -114,15 +121,23 @@ contract OpenVaultHandler is ReentrancyGuard {
     }
 
     // ******* MUTATIVE FUNCTIONS ***********
+    function setVaultFactory(address _vaultFactory) external {
+        require(vaultFactoryActive == false, "Vault deployer already active");
+        vaultFactory = _vaultFactory;
+        vaultFactoryActive = true;
+    }
+
     function addVault(
         address _vault
     ) external returns (bool) {
         IVault vault = IVault(_vault);
         require(vault.active() == true, "vault not active");
         require(addedVaults[_vault] == false, "already added");
+        require(vault.deployer() == vaultFactory, "not factory vault");
 
         address _strategy = vault.strategy();
         IStrategy strategy = IStrategy(_strategy);
+        require(strategy.successfulHarvest() == true, "Need to successfully harvest");
 
         address want = address(strategy.want());
         address strategist = strategy.strategist();
