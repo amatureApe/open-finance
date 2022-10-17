@@ -64,28 +64,28 @@ contract UniswapV2Strategy {
     using SafeERC20 for IERC20;
 
     // Vault addresses
-    address public vault;
-    address public strategist;
+    address public immutable vault;
+    address public immutable strategist;
 
     // Tokens used
-    address public native;
-    address public reward;
-    address public secondReward;
-    address public want;
-    address public lpToken0;
-    address public lpToken1;
+    address public immutable native;
+    address public immutable reward;
+    address public immutable secondReward;
+    address public immutable want;
+    address public immutable lpToken0;
+    address public immutable lpToken1;
 
     // Third party contracts
-    address public chef;
-    uint256 public poolId;
-    address public router;
+    address public immutable chef;
+    uint256 public immutable poolId;
+    address public immutable router;
 
     uint256 public lastHarvest;
 
     // Fees
-    uint256 public maxFee;
-    uint256 public strategistFee;
-    uint256 public harvesterFee;
+    uint256 public immutable maxFee;
+    uint256 public immutable strategistFee;
+    uint256 public immutable harvesterFee;
     uint256 private constant FEE_DIVISOR = 10000;
 
     // Routes

@@ -194,3 +194,19 @@ contract OpenVault is ERC20, ReentrancyGuard {
     }
 
 }
+
+contract OpenVaultFactory {
+   OpenVault[] public OpenVaultArray;
+   address public immutable vaultHandler;
+
+    constructor (
+        address _vaultHandler
+    ) {
+        vaultHandler = _vaultHandler;
+    }
+
+   function CreateNewVault(address _token) public {
+     OpenVault vault = new OpenVault(vaultHandler, _token);
+     OpenVaultArray.push(vault);
+   }
+}
