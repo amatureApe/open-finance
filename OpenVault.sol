@@ -71,10 +71,6 @@ contract OpenVault is ERC20, ReentrancyGuard {
         vaultHandler = IVaultHandler(_vaultHandler);
     }
 
-    function test() public view returns(uint256) {
-        return OpenVaultFactory(deployer).factoryId();
-    }
-
     // Modifier to check if strategy has been set and vault is active
     modifier isActive {
         require(active == true, "vault not active");
