@@ -29,6 +29,11 @@ interface IStrategy {
     function router() external view returns (address);
 }
 
+interface IVaultHandler{
+    function checkUser(address) external view returns (bool);
+    function addUser(address) external;
+}
+
 /**
  * @dev Implementation of a vault to deposit funds for yield optimizing.
  * This is the contract that receives funds and that users interface with.
@@ -40,15 +45,11 @@ contract OpenVault is ERC20, ReentrancyGuard {
 
     // The strategy in use by the vault.
     IStrategy public strategy;
+    // The vaultHandler for this chain
+    IVaultHandler public vaultHandler;
 
     // Bool to identify if strategy has been set and vault is active
     bool public active = false;
-
-    // Modifier to check if strategy has been set and vault is active
-    modifier isActive {
-        require(active == true, "vault not active");
-        _;
-    }
 
     /**
      * @dev Sets the value of {token} to the token that the vault will
@@ -57,11 +58,27 @@ contract OpenVault is ERC20, ReentrancyGuard {
      * to withdraw the corresponding portion of the underlying assets.
      */
     constructor (
+        address _vaultHandler,
         address _token
     ) ERC20(
         string(abi.encodePacked("Open ", ERC20(_token).name())),
         string(abi.encodePacked("OPEN", ERC20(_token).symbol()))
-    ) {}
+    ) {
+        vaultHandler = IVaultHandler(_vaultHandler);
+    }
+
+    // Modifier to check if strategy has been set and vault is active
+    modifier isActive {
+        require(active == true, "vault not active");
+        _;
+    }
+
+    modifier checkUser {
+        if (vaultHandler.checkUser(msg.sender) == true) {
+            vaultHandler.addUser(msg.sender);
+        }
+        _;
+    }
 
     // *********************************************
     // ********** MUTATIVE FUNCTIONS ***************
@@ -86,7 +103,7 @@ contract OpenVault is ERC20, ReentrancyGuard {
      * @dev The entrypoint of funds into the system. People deposit with this function
      * into the vault. The vault is then in charge of sending funds into the strategy.
      */
-    function deposit(uint _amount) public nonReentrant isActive {
+    function deposit(uint _amount) public nonReentrant isActive checkUser {
         uint256 _pool = balance();
         want().safeTransferFrom(msg.sender, address(this), _amount);
         uint256 _after = balance();

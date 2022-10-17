@@ -46,6 +46,13 @@ contract OpenVaultHandler is ReentrancyGuard {
     // Check to see if vault is already added
     mapping(address => bool) public addedVaults;
 
+    // Current userId index
+    uint256 public userId = 0;
+    // All users by userId
+    mapping(uint256 => User) public users;
+    // Check to see if address has used OF before
+    mapping(address => bool) public isUser;
+
     // Current commentId index
     uint256 public commentId = 0;
     // All vault comments by commentId
@@ -79,6 +86,12 @@ contract OpenVaultHandler is ReentrancyGuard {
         uint256 vaultLikes;
         uint256 vaultDislikes;
         uint256 totalCommentary;
+    }
+
+    struct User {
+        uint256 userId;
+        address userAddress;
+        int256 reputation;
     }
 
     // Struct to manage comments on vaults
@@ -144,6 +157,16 @@ contract OpenVaultHandler is ReentrancyGuard {
         vaultId++;
 
         return true;
+    }
+
+    function addUser(address userAddress) external {
+        User memory user = User(
+            userId,
+            userAddress,
+            0
+        );
+        users[userId] = user;
+        userId++;
     }
 
     function addDescription(uint256 _vaultId, string memory description) external {
@@ -223,6 +246,10 @@ contract OpenVaultHandler is ReentrancyGuard {
     function readReply(uint256 _replyId) external view returns (string memory) {
         Reply storage reply = replies[_replyId];
         return string(reply.reply);
+    }
+
+    function checkUser(address user) external view returns (bool) {
+        return isUser[user];
     }
 
 }
