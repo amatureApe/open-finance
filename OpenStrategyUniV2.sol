@@ -60,6 +60,10 @@ interface IRewarder {
     function pendingToken(uint256 pid, address user) external view returns (uint256);
 }
 
+interface IVault {
+    function getPricePerFullShare() external view returns(uint256);
+}
+
 contract UniswapV2Strategy {
     using SafeERC20 for IERC20;
 
@@ -191,7 +195,7 @@ contract UniswapV2Strategy {
             emit StratHarvest(msg.sender, wantHarvested, balanceOf());
         }
 
-        if (successfulHarvest == false) {
+        if (successfulHarvest == false && IVault(vault).getPricePerFullShare() > 1e18) {
             successfulHarvest = true;
         }
     }

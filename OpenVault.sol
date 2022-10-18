@@ -28,6 +28,7 @@ interface IStrategy {
     function balanceOfPool() external view returns (uint256);
     function harvest() external;
     function router() external view returns (address);
+    function successfulHarvest() external view returns(bool);
 }
 
 interface IVaultHandler{
@@ -50,7 +51,8 @@ contract OpenVault is ERC20, ReentrancyGuard {
     IVaultHandler public immutable vaultHandler;
     // The address that deployed this vault
     address public deployer = msg.sender;
-    string public factoryId = Strings.toString(OpenVaultFactory(deployer).factoryId());
+    uint256 public factoryId = OpenVaultFactory(deployer).factoryId();
+    string private factoryIdString = Strings.toString(factoryId);
 
     // Bool to identify if strategy has been set and vault is active
     bool public active = false;
@@ -65,8 +67,8 @@ contract OpenVault is ERC20, ReentrancyGuard {
         address _vaultHandler,
         address _token
     ) ERC20(
-        string(abi.encodePacked("Open ", ERC20(_token).name(), " factoryId-", factoryId)),
-        string(abi.encodePacked("OPEN", ERC20(_token).symbol(),"-", factoryId))
+        string(abi.encodePacked("Open ", ERC20(_token).name(), " factoryId-", factoryIdString)),
+        string(abi.encodePacked("OPEN", ERC20(_token).symbol(),"-", factoryIdString))
     ) {
         vaultHandler = IVaultHandler(_vaultHandler);
     }

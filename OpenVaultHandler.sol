@@ -34,6 +34,7 @@ interface IVault {
     function strategy() external view returns (address);
     function active() external view returns (bool);
     function deployer() external view returns (address);
+    function factoryId() external view returns (uint256);
 }
 
 contract OpenVaultHandler is ReentrancyGuard {
@@ -69,6 +70,9 @@ contract OpenVaultHandler is ReentrancyGuard {
     address public vaultFactory;
     // Check to see if vaultDeployer has been set
     bool public vaultFactoryActive = false;
+
+    mapping(uint256 => uint256) public factoryToVault;
+    mapping(uint256 => uint256) public vaultToFactory;
 
     struct Vault {
         uint256 vaultId;
@@ -131,7 +135,6 @@ contract OpenVaultHandler is ReentrancyGuard {
         address _vault
     ) external returns (bool) {
         IVault vault = IVault(_vault);
-        require(vault.active() == true, "vault not active");
         require(addedVaults[_vault] == false, "already added");
         require(vault.deployer() == vaultFactory, "not factory vault");
 
@@ -139,6 +142,7 @@ contract OpenVaultHandler is ReentrancyGuard {
         IStrategy strategy = IStrategy(_strategy);
         require(strategy.successfulHarvest() == true, "Need to successfully harvest");
 
+        uint256 factoryId = vault.factoryId();
         address want = address(strategy.want());
         address strategist = strategy.strategist();
 
@@ -166,6 +170,9 @@ contract OpenVaultHandler is ReentrancyGuard {
 
         VaultInfo memory info;
         info.vaultId = vaultId;
+
+        factoryToVault[factoryId] = vaultId;
+        vaultToFactory[vaultId] = factoryId;
 
         vaults[vaultId] = __vault;
         vaultInfo[vaultId] = info;
@@ -244,10 +251,6 @@ contract OpenVaultHandler is ReentrancyGuard {
 
     // ******* VIEWS *************
 
-    // function balance(uint256 _vaultId) public view returns (uint) {
-    //   return want().balanceOf(address(this)).add(IStrategy(strategy).balanceOf());
-    // }
-
     function readDescription(uint256 _vaultId) external view returns (string memory) {
         Vault storage vault = vaults[_vaultId];
         return string(vault.description);
@@ -263,8 +266,16 @@ contract OpenVaultHandler is ReentrancyGuard {
         return string(reply.reply);
     }
 
-    function checkUser(address user) external view returns (bool) {
-        return isUser[user];
+    function checkUser(address _user) external view returns (bool) {
+        return isUser[_user];
+    }
+
+    function factoryToVaultLookup(uint256 _factoryId) external view returns (uint256) {
+        return factoryToVault[_factoryId];
+    }
+
+    function vaultToFactoryLookup(uint256 _vaultId) external view returns (uint256) {
+        return vaultToFactory[_vaultId];
     }
 
 }
